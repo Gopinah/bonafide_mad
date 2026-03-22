@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "419830140116",
+    "project_id": "bonafide-a5389",
+    "storage_bucket": "bonafide-a5389.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:419830140116:android:7bc64361c9719704817f41",
+        "android_client_info": {
+          "package_name": "com.example.bonafide_mad"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDeoe-gAnZJN_iqlQjL6atxNMsP6lvv2vU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

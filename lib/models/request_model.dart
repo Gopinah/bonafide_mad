@@ -8,12 +8,12 @@ class RequestModel {
   final String className;
   final String subject;
   final String body;
-  final String? annexureUrl; 
-  final String? certificateUrl;
-  final String status; // pending, rejected, issued
-  final int approvalLevel; // 1: Tutor, 2: HOD, 3: Principal, 4: Office
+  final String status;
+  final int approvalLevel;
   final DateTime timestamp;
-  final String? rejectionReason; // New field
+
+  // ADD THIS
+  final String? rejectionReason;
 
   RequestModel({
     required this.requestId,
@@ -23,11 +23,11 @@ class RequestModel {
     required this.className,
     required this.subject,
     required this.body,
-    this.annexureUrl,
-    this.certificateUrl,
     required this.status,
     required this.approvalLevel,
     required this.timestamp,
+
+    // ADD THIS
     this.rejectionReason,
   });
 
@@ -40,13 +40,14 @@ class RequestModel {
       className: data['class'] ?? '',
       subject: data['subject'] ?? '',
       body: data['body'] ?? '',
-      annexureUrl: data['annexure_url'],
-      certificateUrl: data['certificate_url'],
       status: data['status'] ?? 'pending',
       approvalLevel: data['approval_level'] ?? 1,
-      rejectionReason: data['rejection_reason'],
-      timestamp: data['timestamp'] != null 
-          ? (data['timestamp'] as Timestamp).toDate() 
+
+      // ADD THIS
+      rejectionReason: data['rejectionReason'],
+
+      timestamp: data['timestamp'] != null
+          ? (data['timestamp'] as Timestamp).toDate()
           : DateTime.now(),
     );
   }
@@ -59,11 +60,12 @@ class RequestModel {
       'class': className,
       'subject': subject,
       'body': body,
-      'annexure_url': annexureUrl,
-      'certificate_url': certificateUrl,
       'status': status,
       'approval_level': approvalLevel,
-      'rejection_reason': rejectionReason,
+
+      // ADD THIS
+      'rejectionReason': rejectionReason,
+
       'timestamp': FieldValue.serverTimestamp(),
     };
   }

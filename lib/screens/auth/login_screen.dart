@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../services/auth_service.dart';
 import '../student/student_dashboard.dart';
 import '../staff/staff_dashboard.dart';
-import '../../models/user_model.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -12,261 +12,131 @@ class LoginScreen extends StatefulWidget {
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStateMixin {
-  late TabController _tabController;
-  final TextEditingController _rollNoController = TextEditingController();
-  final TextEditingController _usernameController = TextEditingController();
+class _LoginScreenState extends State<LoginScreen> {
+  final TextEditingController _idController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
-  bool _isLoading = false;
   bool _isPasswordVisible = false;
+  bool _isStudentLogin = true;
+  bool _isLoading = false;
 
-  @override
-  void initState() {
-    super.initState();
-    _tabController = TabController(length: 2, vsync: this);
-    _tabController.addListener(_handleTabSelection);
-  }
-
-  void _handleTabSelection() {
-    if (_tabController.indexIsChanging) {
-      _rollNoController.clear();
-      _usernameController.clear();
+  void _toggleLoginType() {
+    setState(() {
+      _isStudentLogin = !_isStudentLogin;
+      _idController.clear();
       _passwordController.clear();
-    }
-  }
-
-  @override
-  void dispose() {
-    _tabController.removeListener(_handleTabSelection);
-    _tabController.dispose();
-    _rollNoController.dispose();
-    _usernameController.dispose();
-    _passwordController.dispose();
-    super.dispose();
+    });
   }
 
   void _login() async {
-    final String rollNo = _rollNoController.text.trim();
-    final String username = _usernameController.text.trim();
-    final String password = _passwordController.text.trim();
-
-    if (_tabController.index == 0 && (rollNo.isEmpty || password.isEmpty)) {
-      _showError("Please enter Roll Number and Password");
+    if (_idController.text.isEmpty || _passwordController.text.isEmpty) {
+      _showError("Please fill all fields");
       return;
     }
-    if (_tabController.index == 1 && (username.isEmpty || password.isEmpty)) {
-      _showError("Please enter Username and Password");
-      return;
-    }
-
     setState(() => _isLoading = true);
     final authService = Provider.of<AuthService>(context, listen: false);
-    UserModel? user;
-
-    if (_tabController.index == 0) {
-      user = await authService.loginStudent(rollNo, password);
-    } else {
-      user = await authService.loginStaff(username, password);
-    }
-
-    setState(() => _isLoading = false);
-
-    if (user != null) {
-      if (user.role == 'student') {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const StudentDashboard()),
-        );
+    
+    try {
+      dynamic user = _isStudentLogin 
+          ? await authService.loginStudent(_idController.text.trim(), _passwordController.text.trim())
+          : await authService.loginStaff(_idController.text.trim(), _passwordController.text.trim());
+      
+      setState(() => _isLoading = false);
+      
+      if (user != null) {
+        if (mounted) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => _isStudentLogin ? const StudentDashboard() : const StaffDashboard()),
+          );
+        }
       } else {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const StaffDashboard()),
-        );
+        if (mounted) {
+          _showError("Invalid Credentials");
+        }
       }
-    } else {
-      _showError("Invalid Credentials");
+    } catch (e) {
+      setState(() => _isLoading = false);
+      if (mounted) {
+        _showError("Connection error. Please try again.");
+      }
     }
   }
 
   void _showError(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: Colors.red),
+      SnackBar(
+        content: Text(message, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        backgroundColor: Colors.red.shade800,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    const primaryColor = Color(0xFF002366);
     return Scaffold(
       backgroundColor: Colors.white,
-      body: SafeArea(
+      body: Center(
         child: SingleChildScrollView(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24.0),
-            child: Column(
-              children: [
-                const SizedBox(height: 60),
-                // Logo
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.blue.shade50,
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.assignment_turned_in_rounded,
-                    size: 80,
-                    color: Color(0xFF1A73E8),
+          padding: const EdgeInsets.symmetric(horizontal: 32),
+          child: Column(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: const BoxDecoration(color: primaryColor, shape: BoxShape.circle),
+                child: const Icon(Icons.assignment_turned_in_rounded, size: 60, color: Colors.white),
+              ),
+              const SizedBox(height: 16),
+              Text("BONAPRO", style: GoogleFonts.poppins(fontSize: 28, fontWeight: FontWeight.bold, color: primaryColor)),
+              const SizedBox(height: 48),
+              Text(_isStudentLogin ? "Student Login" : "Staff Login", style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600)),
+              const SizedBox(height: 32),
+              TextField(
+                controller: _idController,
+                decoration: InputDecoration(
+                  labelText: _isStudentLogin ? 'Roll Number' : 'Username',
+                  border: const OutlineInputBorder(),
+                  prefixIcon: const Icon(Icons.person),
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: _passwordController,
+                obscureText: !_isPasswordVisible,
+                decoration: InputDecoration(
+                  labelText: 'Password',
+                  border: const OutlineInputBorder(),
+                  prefixIcon: const Icon(Icons.lock),
+                  suffixIcon: IconButton(
+                    icon: Icon(_isPasswordVisible ? Icons.visibility : Icons.visibility_off),
+                    onPressed: () => setState(() => _isPasswordVisible = !_isPasswordVisible),
                   ),
                 ),
-                const SizedBox(height: 16),
-                const Text(
-                  "Bonapro",
-                  style: TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF1A73E8),
+              ),
+              const SizedBox(height: 32),
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: ElevatedButton(
+                  onPressed: _isLoading ? null : _login,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: primaryColor,
+                    foregroundColor: Colors.white,
+                    elevation: 2,
                   ),
+                  child: _isLoading 
+                    ? const CircularProgressIndicator(color: Colors.white) 
+                    : const Text("LOGIN", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                 ),
-                const SizedBox(height: 40),
-                // Tabs
-                Container(
-                  height: 50,
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade100,
-                    borderRadius: BorderRadius.circular(25),
-                  ),
-                  child: TabBar(
-                    controller: _tabController,
-                    indicator: BoxDecoration(
-                      borderRadius: BorderRadius.circular(25),
-                      color: const Color(0xFF1A73E8),
-                    ),
-                    indicatorSize: TabBarIndicatorSize.tab,
-                    labelColor: Colors.white,
-                    unselectedLabelColor: Colors.grey,
-                    tabs: const [
-                      Tab(text: 'Student'),
-                      Tab(text: 'Staff'),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 30),
-                // Input Fields
-                SizedBox(
-                  height: 250, // Increased height to accommodate forgot password link
-                  child: TabBarView(
-                    controller: _tabController,
-                    children: [
-                      // Student Login Fields
-                      Column(
-                        children: [
-                          TextField(
-                            controller: _rollNoController,
-                            decoration: const InputDecoration(
-                              labelText: 'Roll Number',
-                              prefixIcon: Icon(Icons.badge),
-                              border: OutlineInputBorder(),
-                            ),
-                          ),
-                          const SizedBox(height: 20),
-                          TextField(
-                            controller: _passwordController,
-                            obscureText: !_isPasswordVisible,
-                            decoration: InputDecoration(
-                              labelText: 'Password',
-                              prefixIcon: const Icon(Icons.lock),
-                              border: const OutlineInputBorder(),
-                              suffixIcon: IconButton(
-                                icon: Icon(
-                                  _isPasswordVisible ? Icons.visibility : Icons.visibility_off,
-                                ),
-                                onPressed: () {
-                                  setState(() {
-                                    _isPasswordVisible = !_isPasswordVisible;
-                                  });
-                                },
-                              ),
-                            ),
-                          ),
-                          Align(
-                            alignment: Alignment.centerRight,
-                            child: TextButton(
-                              onPressed: () {
-                                // Logic will be implemented later
-                              },
-                              child: const Text("Forgot Password?"),
-                            ),
-                          ),
-                        ],
-                      ),
-                      // Staff Login Fields
-                      Column(
-                        children: [
-                          TextField(
-                            controller: _usernameController,
-                            decoration: const InputDecoration(
-                              labelText: 'Username',
-                              prefixIcon: Icon(Icons.person),
-                              border: OutlineInputBorder(),
-                            ),
-                          ),
-                          const SizedBox(height: 20),
-                          TextField(
-                            controller: _passwordController,
-                            obscureText: !_isPasswordVisible,
-                            decoration: InputDecoration(
-                              labelText: 'Password',
-                              prefixIcon: const Icon(Icons.lock),
-                              border: const OutlineInputBorder(),
-                              suffixIcon: IconButton(
-                                icon: Icon(
-                                  _isPasswordVisible ? Icons.visibility : Icons.visibility_off,
-                                ),
-                                onPressed: () {
-                                  setState(() {
-                                    _isPasswordVisible = !_isPasswordVisible;
-                                  });
-                                },
-                              ),
-                            ),
-                          ),
-                          Align(
-                            alignment: Alignment.centerRight,
-                            child: TextButton(
-                              onPressed: () {
-                                // Logic will be implemented later
-                              },
-                              child: const Text("Forgot Password?"),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 10),
-                _isLoading
-                    ? const CircularProgressIndicator()
-                    : SizedBox(
-                        width: double.infinity,
-                        height: 50,
-                        child: ElevatedButton(
-                          onPressed: _login,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF1A73E8),
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                          ),
-                          child: const Text(
-                            "LOGIN",
-                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                          ),
-                        ),
-                      ),
-              ],
-            ),
+              ),
+              const SizedBox(height: 24),
+              TextButton(
+                onPressed: _toggleLoginType,
+                child: Text(_isStudentLogin ? "Switch to Staff Login" : "Switch to Student Login", style: const TextStyle(color: primaryColor, fontWeight: FontWeight.bold)),
+              ),
+            ],
           ),
         ),
       ),

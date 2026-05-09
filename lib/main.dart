@@ -7,12 +7,7 @@ import 'services/auth_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  try {
-    await Firebase.initializeApp();
-    print("Firebase Initialized Successfully");
-  } catch (e) {
-    print("Firebase Initialization Failed: $e");
-  }
+  await Firebase.initializeApp();
   runApp(
     MultiProvider(
       providers: [
@@ -33,9 +28,9 @@ class BonaproApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF1A73E8),
-          primary: const Color(0xFF1A73E8),
-          secondary: const Color(0xFF0D47A1),
+          seedColor: const Color(0xFF002366),
+          primary: const Color(0xFF002366),
+          secondary: const Color(0xFF003366),
         ),
         useMaterial3: true,
         textTheme: GoogleFonts.poppinsTextTheme(Theme.of(context).textTheme),
@@ -72,41 +67,22 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: const Color(0xFF002366),
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
               padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Colors.blue.shade50,
+              decoration: const BoxDecoration(
+                color: Colors.white,
                 shape: BoxShape.circle,
               ),
-              child: const Icon(
-                Icons.assignment_turned_in_rounded,
-                size: 100,
-                color: Color(0xFF1A73E8),
-              ),
+              child: const Icon(Icons.assignment_turned_in_rounded, size: 80, color: Color(0xFF002366)),
             ),
             const SizedBox(height: 24),
-            Text(
-              "Bonapro",
-              style: GoogleFonts.poppins(
-                fontSize: 32,
-                fontWeight: FontWeight.bold,
-                color: const Color(0xFF1A73E8),
-                letterSpacing: 1.2,
-              ),
-            ),
-            Text(
-              "Smart Certificate Automation",
-              style: GoogleFonts.poppins(
-                fontSize: 16,
-                color: Colors.grey,
-                fontStyle: FontStyle.italic,
-              ),
-            ),
+            Text("Bonapro", style: GoogleFonts.poppins(fontSize: 36, fontWeight: FontWeight.bold, color: Colors.white)),
+            const Text("Smart Certificate Automation", style: TextStyle(color: Colors.white70, fontStyle: FontStyle.italic)),
           ],
         ),
       ),

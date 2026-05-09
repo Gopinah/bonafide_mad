@@ -1,17 +1,3 @@
-# bonafide_mad
+# Bonapro - Bonafide Certificate Management System
 
-A new Flutter project.
-
-## Getting Started
-
-This project is a starting point for a Flutter application.
-
-A few resources to get you started if this is your first Flutter project:
-
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
-
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+Bonapro is a professional, hierarchy-driven Bonafide Certificate Management System built using a robust Flutter frontend and a serverless Firebase backend, leveraging Cloud Firestore's real-time NoSQL capabilities for seamless data synchronization across all institutional stakeholders. The application features a secure, custom authentication system with role-specific logins for students (Roll No) and staff (Username), incorporating intuitive UI elements like field-clearing on tab transitions and password visibility toggles to enhance security. At its core, Bonapro implements a strict sequential approval workflow where requests move dynamically through four distinct levels—Tutor, HOD, Principal, and Office Staff—ensuring that each authority only gains visibility of a request once the preceding level has granted approval. This 'smart routing' logic is complemented by a mandatory rejection feedback mechanism that requires authorities to provide specific reasons for declining a request, which then instantly removes the item from all staff dashboards while updating the student’s real-time monitoring interface. Students benefit from a high-fidelity tracking dashboard featuring a visual progress indicator that monitors their application's journey through the institutional chain, culminating in a final issuance phase where Office Staff can upload the legitimate PDF certificate for instant student download. By utilizing a serverless architecture, Bonapro eliminates the need for manual paperwork and physical server maintenance, providing a scalable, transparent, and operationally efficient solution for modern academic institutions.

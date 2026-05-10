@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:intl/intl.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../services/auth_service.dart';
 import '../../services/database_service.dart';
 import '../../models/request_model.dart';
-import 'package:intl/intl.dart';
 import 'request_detail_screen.dart';
 
 class StaffDashboard extends StatelessWidget {
@@ -13,14 +14,14 @@ class StaffDashboard extends StatelessWidget {
   Widget build(BuildContext context) {
     final user = Provider.of<AuthService>(context).currentUser;
     final db = DatabaseService();
-
-    final bool isGlobal = user?.role == 'principal' || user?.role == 'office';
+    const primaryColor = Color(0xFF002366);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FA),
       appBar: AppBar(
-        title: Text('${user?.role.toUpperCase()} Dashboard', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
-        backgroundColor: const Color(0xFF002366),
+        title: Text('${user?.role.toUpperCase()} Dashboard', 
+          style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: Colors.white)),
+        backgroundColor: primaryColor,
         elevation: 0,
         actions: [
           IconButton(
@@ -34,28 +35,34 @@ class StaffDashboard extends StatelessWidget {
       ),
       body: Column(
         children: [
-          _buildHeader(user, isGlobal),
+          _buildHeader(user),
+          
           Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                user?.role == 'office' ? 'Requests Ready for Issuance' : 'Pending Approvals',
-                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF002366)),
-              ),
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
+            child: Row(
+              children: [
+                Container(
+                  width: 4,
+                  height: 20,
+                  decoration: BoxDecoration(color: primaryColor, borderRadius: BorderRadius.circular(2)),
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  user?.role == 'office' ? "Approved Requests for Issuance" : "Pending Approvals",
+                  style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.bold, color: primaryColor),
+                ),
+              ],
             ),
           ),
+          
           Expanded(
             child: StreamBuilder<List<RequestModel>>(
-              stream: db.getStaffRequests(user!),
+              stream: db.getPendingStaffRequests(user!),
               builder: (context, snapshot) {
-                if (snapshot.hasError) {
-                  // This will now show the Index Error in the UI
-                  return _buildErrorState(snapshot.error.toString());
-                }
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                }
+                if (snapshot.hasError) return Center(child: Text("Error: ${snapshot.error}"));
+                if (snapshot.connectionState == ConnectionState.waiting) 
+                  return const Center(child: CircularProgressIndicator(color: primaryColor));
+                
                 if (!snapshot.hasData || snapshot.data!.isEmpty) {
                   return _buildEmptyState();
                 }
@@ -76,31 +83,22 @@ class StaffDashboard extends StatelessWidget {
     );
   }
 
-  Widget _buildHeader(user, bool isGlobal) {
+  Widget _buildHeader(user) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.fromLTRB(24, 20, 24, 40),
       decoration: const BoxDecoration(
         color: Color(0xFF002366),
-        borderRadius: BorderRadius.only(
-          bottomLeft: Radius.circular(30),
-          bottomRight: Radius.circular(30),
-        ),
+        borderRadius: BorderRadius.only(bottomLeft: Radius.circular(35), bottomRight: Radius.circular(35)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            user?.name ?? "Staff",
-            style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
-          ),
-          if (!isGlobal) ...[
-            const SizedBox(height: 5),
-            Text(
-              "Dept: ${user?.department} ${user?.className != null ? "| Class: ${user?.className}" : ""}",
-              style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 14),
-            ),
-          ],
+          Text(user?.name ?? "Staff", 
+            style: GoogleFonts.poppins(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 4),
+          Text("Dept: ${user?.department} | ${user?.role.toUpperCase()}", 
+            style: GoogleFonts.poppins(color: Colors.white70, fontSize: 14)),
         ],
       ),
     );
@@ -111,38 +109,10 @@ class StaffDashboard extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.done_all_rounded, size: 80, color: Colors.grey.withOpacity(0.5)),
+          Icon(Icons.checklist_rtl_outlined, size: 80, color: Colors.grey.withOpacity(0.3)),
           const SizedBox(height: 16),
-          const Text("No pending requests", style: TextStyle(fontSize: 18, color: Colors.grey)),
+          Text("All caught up!", style: GoogleFonts.poppins(fontSize: 18, color: Colors.grey)),
         ],
-      ),
-    );
-  }
-
-  Widget _buildErrorState(String error) {
-    bool isIndexError = error.contains("requires an index");
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.warning_amber_rounded, size: 60, color: Colors.orange),
-            const SizedBox(height: 16),
-            Text(
-              isIndexError ? "Database Index Required" : "Something went wrong",
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              isIndexError 
-                ? "Please check your terminal logs and click the link to create a Firestore Index. This is necessary for sorting to work."
-                : error,
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: Colors.grey),
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -153,25 +123,22 @@ class StaffDashboard extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(15),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 4)),
-        ],
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 4))],
       ),
       child: ListTile(
         contentPadding: const EdgeInsets.all(16),
-        title: Text(
-          req.studentName,
-          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Color(0xFF002366)),
-        ),
+        title: Text(req.studentName, 
+          style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 18, color: const Color(0xFF002366))),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const SizedBox(height: 8),
-            Text("Subject: ${req.subject}"),
-            Text("Applied: ${DateFormat('dd MMM yyyy').format(req.timestamp)}", style: const TextStyle(fontSize: 12, color: Colors.grey)),
+            const SizedBox(height: 4),
+            Text("Subject: ${req.subject}", style: GoogleFonts.poppins(fontSize: 13, color: Colors.black87)),
+            Text("Applied: ${DateFormat('dd MMM yyyy').format(req.timestamp)}", 
+              style: GoogleFonts.poppins(fontSize: 12, color: Colors.grey)),
           ],
         ),
-        trailing: const Icon(Icons.arrow_forward_ios, color: Color(0xFF002366), size: 18),
+        trailing: const Icon(Icons.arrow_forward_ios, color: Color(0xFF002366), size: 16),
         onTap: () => Navigator.push(
           context,
           MaterialPageRoute(builder: (context) => RequestDetailScreen(request: req)),

@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../services/auth_service.dart';
 import '../../services/database_service.dart';
 import '../../models/request_model.dart';
 import 'request_form_screen.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 class StudentDashboard extends StatelessWidget {
   const StudentDashboard({super.key});
@@ -17,8 +17,8 @@ class StudentDashboard extends StatelessWidget {
     final db = DatabaseService();
     const primaryColor = Color(0xFF002366);
 
-    // FIX: Using user.userId (unique document ID) to match the 'student_id' field in Firestore
-    final String studentIdentifier = user?.userId ?? "";
+    // Standardized student identifier
+    final String studentId = user?.userId ?? "";
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FA),
@@ -41,7 +41,7 @@ class StudentDashboard extends StatelessWidget {
           _buildHeader(user),
           Expanded(
             child: StreamBuilder<List<RequestModel>>(
-              stream: db.getStudentRequests(studentIdentifier),
+              stream: db.getStudentRequests(studentId),
               builder: (context, snapshot) {
                 if (snapshot.hasError) return Center(child: Text("Error: ${snapshot.error}"));
                 if (snapshot.connectionState == ConnectionState.waiting) {
@@ -120,14 +120,14 @@ class StudentDashboard extends StatelessWidget {
             Text("Applied: ${DateFormat('dd MMM yyyy').format(req.timestamp)}", style: GoogleFonts.poppins(color: Colors.grey, fontSize: 13)),
             const Padding(padding: EdgeInsets.symmetric(vertical: 12), child: Divider(height: 1)),
             _buildStatusTracker(req.approvalLevel, req.status),
-            if (req.status == 'Issued' && req.bonafidePdfUrl != null) ...[
+            if (req.status == 'Issued' && req.bonafideImageUrl != null) ...[
               const SizedBox(height: 20),
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
-                  onPressed: () => _openUrl(req.bonafidePdfUrl!),
-                  icon: const Icon(Icons.download, size: 20),
-                  label: Text("Download Certificate", style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
+                  onPressed: () => _viewCertificate(context, req.bonafideImageUrl!),
+                  icon: const Icon(Icons.card_membership, size: 20),
+                  label: Text("View Certificate", style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF4CAF50),
                     foregroundColor: Colors.white,
@@ -145,6 +145,48 @@ class StudentDashboard extends StatelessWidget {
                 child: Text("Reason: ${req.rejectionReason ?? 'N/A'}", style: TextStyle(color: Colors.red.shade800, fontSize: 13)),
               )
             ]
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _viewCertificate(BuildContext context, String url) {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        insetPadding: const EdgeInsets.all(10),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            AppBar(
+              title: Text("Bonafide Certificate", style: GoogleFonts.poppins(fontSize: 16)),
+              backgroundColor: const Color(0xFF002366),
+              foregroundColor: Colors.white,
+              leading: const CloseButton(),
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.download),
+                  onPressed: () => launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication),
+                ),
+              ],
+            ),
+            Flexible(
+              child: Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: InteractiveViewer(
+                  child: Image.network(
+                    url,
+                    loadingBuilder: (context, child, progress) {
+                      if (progress == null) return child;
+                      return const Center(child: CircularProgressIndicator());
+                    },
+                    errorBuilder: (context, error, stackTrace) => const Center(child: Text("Error loading image")),
+                  ),
+                ),
+              ),
+            ),
           ],
         ),
       ),
@@ -215,12 +257,5 @@ class StudentDashboard extends StatelessWidget {
         ],
       ),
     );
-  }
-
-  void _openUrl(String url) async {
-    final uri = Uri.parse(url);
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    }
   }
 }

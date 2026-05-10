@@ -48,7 +48,7 @@ class StaffDashboard extends StatelessWidget {
                 ),
                 const SizedBox(width: 10),
                 Text(
-                  user?.role == 'office' ? "Approved Requests for Issuance" : "Pending Approvals",
+                  "Pending Actions",
                   style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.bold, color: primaryColor),
                 ),
               ],

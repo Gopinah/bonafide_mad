@@ -5,8 +5,9 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import '../../services/database_service.dart';
-import '../../services/pdf_service.dart';
+import '../../services/certificate_service.dart';
 import '../../models/request_model.dart';
+import '../../models/user_model.dart';
 
 class OfficeVerificationScreen extends StatefulWidget {
   const OfficeVerificationScreen({super.key});
@@ -29,7 +30,7 @@ class _OfficeVerificationScreenState extends State<OfficeVerificationScreen> {
     }
   }
 
-  /// Flow: 1. Generate & Preview -> 2. Edit (if needed) -> 3. Issue (Upload)
+  /// Flow: 1. Generate & Preview -> 2. Edit -> 3. Issue (Upload as Image)
   Future<void> _processIssuance(RequestModel request) async {
     final TextEditingController _editController = TextEditingController(text: request.body);
     
@@ -51,8 +52,10 @@ class _OfficeVerificationScreenState extends State<OfficeVerificationScreen> {
               controller: _editController,
               maxLines: 4,
               decoration: InputDecoration(
-                labelText: "Certificate Body Text",
+                labelText: "Certificate Content",
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                filled: true,
+                fillColor: Colors.grey.shade50,
               ),
             ),
             const SizedBox(height: 20),
@@ -62,25 +65,13 @@ class _OfficeVerificationScreenState extends State<OfficeVerificationScreen> {
                   child: OutlinedButton.icon(
                     onPressed: () async {
                       // Temporary update for preview
-                      RequestModel previewReq = RequestModel(
-                        requestId: request.requestId,
-                        approvalLevel: request.approvalLevel,
-                        body: _editController.text,
-                        className: request.className,
-                        department: request.department,
-                        status: request.status,
-                        studentId: request.studentId,
-                        studentName: request.studentName,
-                        subject: request.subject,
-                        timestamp: request.timestamp,
-                        year: request.year,
-                        reason: request.reason,
-                      );
-                      File file = await PdfService.generateBonafidePdf(previewReq);
+                      RequestModel previewReq = _getUpdatedRequest(request, _editController.text);
+                      File file = await CertificateService.generateCertificateImage(previewReq);
+                      // On mobile, opening a local image file
                       final Uri uri = Uri.file(file.path);
                       await launchUrl(uri);
                     },
-                    icon: const Icon(Icons.picture_as_pdf),
+                    icon: const Icon(Icons.remove_red_eye),
                     label: const Text("PREVIEW"),
                   ),
                 ),
@@ -103,40 +94,46 @@ class _OfficeVerificationScreenState extends State<OfficeVerificationScreen> {
     );
   }
 
+  RequestModel _getUpdatedRequest(RequestModel original, String newBody) {
+    return RequestModel(
+      requestId: original.requestId,
+      approvalLevel: original.approvalLevel,
+      body: newBody,
+      className: original.className,
+      department: original.department,
+      status: original.status,
+      studentId: original.studentId,
+      studentName: original.studentName,
+      subject: original.subject,
+      timestamp: original.timestamp,
+      year: original.year,
+      reason: original.reason,
+    );
+  }
+
   Future<void> _issueFinal(RequestModel request, String updatedBody) async {
     setState(() => _isProcessing[request.requestId] = true);
     try {
-      // 1. Update body in Firestore first
+      // 1. Update body in Firestore
       await _db.updateRequestBody(request.requestId, updatedBody);
       
-      // 2. Generate PDF with updated body
-      RequestModel finalReq = RequestModel(
-        requestId: request.requestId,
-        approvalLevel: request.approvalLevel,
-        body: updatedBody,
-        className: request.className,
-        department: request.department,
-        status: request.status,
-        studentId: request.studentId,
-        studentName: request.studentName,
-        subject: request.subject,
-        timestamp: request.timestamp,
-        year: request.year,
-        reason: request.reason,
-      );
-      File pdfFile = await PdfService.generateBonafidePdf(finalReq);
+      // 2. Generate Image with updated body
+      RequestModel finalReq = _getUpdatedRequest(request, updatedBody);
+      File imageFile = await CertificateService.generateCertificateImage(finalReq);
 
-      // 3. Upload as RAW
-      String? url = await _db.uploadToCloudinary(pdfFile, resourceType: 'raw');
+      // 3. Upload to Cloudinary (image/upload)
+      String? url = await _db.uploadToCloudinary(imageFile);
       
       if (url != null) {
         await _db.finalizeIssuance(request.requestId, url);
-        _showSnackBar("Bonafide Issued Successfully!");
+        _showSnackBar("Bonafide Image Issued Successfully!");
+      } else {
+        throw "Cloudinary upload failed";
       }
     } catch (e) {
       _showSnackBar("Error: $e", isError: true);
     } finally {
-      setState(() => _isProcessing.remove(request.requestId));
+      if (mounted) setState(() => _isProcessing.remove(request.requestId));
     }
   }
 
@@ -195,7 +192,7 @@ class _OfficeVerificationScreenState extends State<OfficeVerificationScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(req.studentName, style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 18, color: primaryColor)),
-                _buildStatusChip("PENDING OFFICE"),
+                _buildStatusChip("PENDING ISSUE"),
               ],
             ),
             const SizedBox(height: 4),
@@ -218,7 +215,7 @@ class _OfficeVerificationScreenState extends State<OfficeVerificationScreen> {
                     onPressed: processing ? null : () => _processIssuance(req),
                     icon: processing 
                       ? const SizedBox(width: 15, height: 15, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                      : const Icon(Icons.edit_document, size: 18),
+                      : const Icon(Icons.auto_awesome, size: 18),
                     label: Text(processing ? "ISSUING..." : "GENERATE & ISSUE", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.orange.shade800,

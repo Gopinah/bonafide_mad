@@ -59,6 +59,37 @@ class AuthService extends ChangeNotifier {
     }
   }
 
+  // --- RESTORED FORGOT PASSWORD METHODS ---
+
+  /// Verifies if a user exists for password reset purposes.
+  Future<String?> verifyUserForReset(String id) async {
+    try {
+      // Check students (roll_no)
+      final studentCheck = await _db.collection('users').where('roll_no', isEqualTo: id).get();
+      if (studentCheck.docs.isNotEmpty) return studentCheck.docs.first.id;
+
+      // Check staff (username)
+      final staffCheck = await _db.collection('users').where('username', isEqualTo: id).get();
+      if (staffCheck.docs.isNotEmpty) return staffCheck.docs.first.id;
+
+      return null;
+    } catch (e) {
+      debugPrint("Verify User Error: $e");
+      return null;
+    }
+  }
+
+  /// Resets the user's password in Firestore.
+  Future<bool> resetPassword(String docId, String newPassword) async {
+    try {
+      await _db.collection('users').doc(docId).update({'password': newPassword});
+      return true;
+    } catch (e) {
+      debugPrint("Reset Password Error: $e");
+      return false;
+    }
+  }
+
   void logout() {
     _currentUser = null;
     notifyListeners();

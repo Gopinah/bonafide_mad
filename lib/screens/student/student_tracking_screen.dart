@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../services/auth_service.dart';
 import '../../services/database_service.dart';
 import '../../models/request_model.dart';
@@ -11,22 +10,14 @@ import '../../models/request_model.dart';
 class StudentTrackingScreen extends StatelessWidget {
   const StudentTrackingScreen({super.key});
 
-  Future<void> _openPdf(String url) async {
-    final Uri uri = Uri.parse(url);
-    try {
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-      }
-    } catch (e) {
-      debugPrint("Error opening bonafide PDF: $e");
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final user = Provider.of<AuthService>(context).currentUser;
     final db = DatabaseService();
     final Color primaryColor = const Color(0xFF002366);
+
+    // Standardized identifier
+    final String studentId = user?.userId ?? "";
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
@@ -37,7 +28,7 @@ class StudentTrackingScreen extends StatelessWidget {
         iconTheme: const IconThemeData(color: Colors.white),
       ),
       body: StreamBuilder<List<RequestModel>>(
-        stream: db.getStudentRequests(user?.userId ?? ""),
+        stream: db.getStudentRequests(studentId),
         builder: (context, snapshot) {
           if (snapshot.hasError) {
             return Center(child: Text("Error: ${snapshot.error}", style: const TextStyle(color: Colors.red)));
@@ -52,7 +43,7 @@ class StudentTrackingScreen extends StatelessWidget {
                 children: [
                   Icon(Icons.history_edu_outlined, size: 64, color: Colors.grey.shade400),
                   const SizedBox(height: 16),
-                  Text("No bonafide requests yet", 
+                  Text("No requests found", 
                     style: GoogleFonts.poppins(color: Colors.grey, fontSize: 18)),
                 ],
               ),
@@ -73,6 +64,9 @@ class StudentTrackingScreen extends StatelessWidget {
   }
 
   Widget _buildTrackingCard(BuildContext context, RequestModel req, Color primaryColor) {
+    final String status = req.status;
+    final String? imageUrl = req.bonafideImageUrl;
+
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
@@ -94,7 +88,7 @@ class StudentTrackingScreen extends StatelessWidget {
                   child: Text(req.subject, 
                     style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 18, color: primaryColor)),
                 ),
-                _buildStatusChip(req.status),
+                _buildStatusChip(status),
               ],
             ),
             const SizedBox(height: 16),
@@ -105,7 +99,7 @@ class StudentTrackingScreen extends StatelessWidget {
               _buildInfoRow(Icons.upload_file, "Annexure Uploaded", 
                 DateFormat('dd MMM yyyy').format(req.uploadedAt!)),
 
-            if (req.status == 'Issued' && req.issuedAt != null) ...[
+            if (status == 'Issued' && req.issuedAt != null) ...[
               const SizedBox(height: 8),
               _buildInfoRow(Icons.verified, "Issued on", 
                 DateFormat('dd MMM yyyy, hh:mm a').format(req.issuedAt!)),
@@ -113,13 +107,13 @@ class StudentTrackingScreen extends StatelessWidget {
             
             const Divider(height: 32),
             
-            if (req.status == 'Issued' && req.bonafidePdfUrl != null)
+            if (status == 'Issued' && imageUrl != null)
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
-                  onPressed: () => _openPdf(req.bonafidePdfUrl!),
-                  icon: const Icon(Icons.download_for_offline),
-                  label: const Text("DOWNLOAD BONAFIDE PDF", 
+                  onPressed: () => _viewCertificate(context, imageUrl),
+                  icon: const Icon(Icons.remove_red_eye),
+                  label: const Text("VIEW CERTIFICATE IMAGE", 
                     style: TextStyle(fontWeight: FontWeight.bold)),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.green.shade700,
@@ -129,7 +123,7 @@ class StudentTrackingScreen extends StatelessWidget {
                   ),
                 ),
               )
-            else if (req.status == 'Rejected')
+            else if (status == 'Rejected')
               Center(
                 child: Text("Status: Rejected. Reason: ${req.rejectionReason ?? 'Contact Office'}",
                   style: const TextStyle(color: Colors.red, fontWeight: FontWeight.w500)),
@@ -137,12 +131,53 @@ class StudentTrackingScreen extends StatelessWidget {
             else
               Center(
                 child: Text(
-                  req.status == 'Approved' 
-                    ? "Approved! Office is preparing your certificate." 
-                    : "Office is currently verifying your request.",
+                  status == 'Approved' 
+                    ? "Approved! Office is preparing your certificate image." 
+                    : "Authorities are currently verifying your request.",
                   style: TextStyle(color: Colors.grey.shade600, fontStyle: FontStyle.italic),
                 ),
               ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _viewCertificate(BuildContext context, String url) {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            AppBar(
+              title: Text("Bonafide Certificate", style: GoogleFonts.poppins(fontSize: 16)),
+              backgroundColor: const Color(0xFF002366),
+              foregroundColor: Colors.white,
+              leading: const CloseButton(),
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.download),
+                  onPressed: () => launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication),
+                ),
+              ],
+            ),
+            Flexible(
+              child: Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: InteractiveViewer(
+                  child: Image.network(
+                    url,
+                    loadingBuilder: (context, child, progress) {
+                      if (progress == null) return child;
+                      return const Center(child: CircularProgressIndicator());
+                    },
+                    errorBuilder: (context, error, stackTrace) => const Center(child: Text("Error loading image")),
+                  ),
+                ),
+              ),
+            ),
           ],
         ),
       ),

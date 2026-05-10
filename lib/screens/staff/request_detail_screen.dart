@@ -6,7 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../models/request_model.dart';
 import '../../services/auth_service.dart';
 import '../../services/database_service.dart';
-import '../../services/pdf_service.dart';
+import '../../services/certificate_service.dart';
 
 class RequestDetailScreen extends StatefulWidget {
   final RequestModel request;
@@ -73,7 +73,7 @@ class _RequestDetailScreenState extends State<RequestDetailScreen> {
     }
   }
 
-  /// Office Staff specific: Generate, Edit, and Issue
+  /// Office Staff flow: Edit content, Preview Image, and Issue
   Future<void> _processIssuance() async {
     showModalBottomSheet(
       context: context,
@@ -85,7 +85,7 @@ class _RequestDetailScreenState extends State<RequestDetailScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text("Edit & Issue Bonafide", style: GoogleFonts.poppins(fontSize: 20, fontWeight: FontWeight.bold, color: const Color(0xFF002366))),
+            Text("Edit Certificate Content", style: GoogleFonts.poppins(fontSize: 20, fontWeight: FontWeight.bold, color: const Color(0xFF002366))),
             const SizedBox(height: 15),
             TextFormField(
               controller: _bodyEditController,
@@ -104,10 +104,11 @@ class _RequestDetailScreenState extends State<RequestDetailScreen> {
                   child: OutlinedButton.icon(
                     onPressed: () async {
                       RequestModel previewReq = _getUpdatedRequest();
-                      File file = await PdfService.generateBonafidePdf(previewReq);
+                      File file = await CertificateService.generateCertificateImage(previewReq);
+                      // Preview local image
                       await launchUrl(Uri.file(file.path));
                     },
-                    icon: const Icon(Icons.picture_as_pdf),
+                    icon: const Icon(Icons.remove_red_eye_outlined),
                     label: const Text("PREVIEW"),
                   ),
                 ),
@@ -155,19 +156,22 @@ class _RequestDetailScreenState extends State<RequestDetailScreen> {
     setState(() => _isProcessing = true);
     final db = DatabaseService();
     try {
-      // 1. Generate final PDF
-      File pdfFile = await PdfService.generateBonafidePdf(_getUpdatedRequest());
+      // 1. Update body text in Firestore
+      await db.updateRequestBody(widget.request.requestId, _bodyEditController.text);
+      
+      // 2. Generate Image (PNG)
+      File imageFile = await CertificateService.generateCertificateImage(_getUpdatedRequest());
 
-      // 2. Upload to Cloudinary with 'raw' resource type
-      String? url = await db.uploadToCloudinary(pdfFile);
+      // 3. Upload to Cloudinary as Image
+      String? url = await db.uploadToCloudinary(imageFile);
       
       if (url != null) {
-        // 3. Finalize in Firestore
+        // 4. Mark as Issued with Image URL
         await db.finalizeIssuance(widget.request.requestId, url);
         if (mounted) {
           Navigator.pop(context);
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text("Certificate Issued Successfully!"), backgroundColor: Colors.green),
+            const SnackBar(content: Text("Certificate Image Issued Successfully!"), backgroundColor: Colors.green),
           );
         }
       } else {
@@ -208,8 +212,44 @@ class _RequestDetailScreenState extends State<RequestDetailScreen> {
 
   void _viewAnnexure() async {
     if (widget.request.annexureUrl == null || widget.request.annexureUrl!.isEmpty) return;
-    final Uri uri = Uri.parse(widget.request.annexureUrl!);
-    await launchUrl(uri, mode: LaunchMode.externalApplication);
+    
+    final String url = DatabaseService.fixCloudinaryUrl(widget.request.annexureUrl);
+    final Uri uri = Uri.parse(url);
+    
+    // For PDFs, use browser. For Images, show dialog.
+    if (widget.request.annexureFileType == 'pdf' || url.toLowerCase().contains('.pdf')) {
+       await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } else {
+      showDialog(
+        context: context,
+        builder: (context) => Dialog(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              AppBar(
+                title: Text("Annexure Preview", style: GoogleFonts.poppins(fontSize: 16)),
+                backgroundColor: const Color(0xFF002366),
+                foregroundColor: Colors.white,
+                leading: const CloseButton(),
+              ),
+              Flexible(
+                child: Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: Image.network(
+                    url,
+                    loadingBuilder: (context, child, progress) {
+                      if (progress == null) return child;
+                      return const Center(child: CircularProgressIndicator());
+                    },
+                    errorBuilder: (context, error, stackTrace) => const Center(child: Text("Error loading image")),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
   }
 
   @override
@@ -265,6 +305,8 @@ class _RequestDetailScreenState extends State<RequestDetailScreen> {
                     ),
                   
                   const SizedBox(height: 40),
+                  // Logic: If it's office and at level 4, they only see Issue. 
+                  // They don't see approve/reject as per new requirement.
                   if (isOffice && widget.request.approvalLevel == 4)
                     _buildOfficeAction()
                   else if (!isOffice)
@@ -276,19 +318,25 @@ class _RequestDetailScreenState extends State<RequestDetailScreen> {
   }
 
   Widget _buildOfficeAction() {
-    return SizedBox(
-      width: double.infinity,
-      height: 60,
-      child: ElevatedButton.icon(
-        onPressed: _processIssuance,
-        icon: const Icon(Icons.auto_fix_high),
-        label: Text("GENERATE & ISSUE BONAFIDE", style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 16)),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.orange.shade800,
-          foregroundColor: Colors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+    return Column(
+      children: [
+        SizedBox(
+          width: double.infinity,
+          height: 60,
+          child: ElevatedButton.icon(
+            onPressed: _processIssuance,
+            icon: const Icon(Icons.auto_awesome),
+            label: Text("GENERATE & ISSUE CERTIFICATE", style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 16)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.orange.shade800,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+            ),
+          ),
         ),
-      ),
+        const SizedBox(height: 12),
+        const Text("Office staff performs final issuance only.", style: TextStyle(color: Colors.grey, fontStyle: FontStyle.italic, fontSize: 12)),
+      ],
     );
   }
 
@@ -299,7 +347,7 @@ class _RequestDetailScreenState extends State<RequestDetailScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(15),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 15)],
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 10)],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

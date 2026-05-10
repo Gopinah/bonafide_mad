@@ -7,17 +7,17 @@ class RequestModel {
   final String className;
   final String department;
   final String status;
-  final String studentId; // Consistent identifier (Roll No)
+  final String studentId;
   final String studentName;
   final String subject;
   final DateTime timestamp;
   
-  // New Fields
+  // Fields
   final String? year;
   final String? reason;
   final String? annexureUrl;
   final String? annexureFileType;
-  final String? bonafidePdfUrl;
+  final String? bonafideImageUrl; // REPLACED bonafide_pdf_url
   final DateTime? uploadedAt;
   final DateTime? issuedAt;
   final String? rejectionReason;
@@ -37,29 +37,11 @@ class RequestModel {
     this.reason,
     this.annexureUrl,
     this.annexureFileType,
-    this.bonafidePdfUrl,
+    this.bonafideImageUrl,
     this.uploadedAt,
     this.issuedAt,
     this.rejectionReason,
   });
-
-  /// CRITICAL: Fixes Cloudinary URLs for PDFs to avoid ERR_INVALID_RESPONSE
-  /// Forces /raw/ path and ensures browser compatibility for mobile browsers
-  static String _fixUrl(String? url) {
-    if (url == null || url.isEmpty) return '';
-    String fixed = url;
-    if (url.toLowerCase().contains('.pdf')) {
-       // PDFs must be served through the /raw/ endpoint, not /image/
-       if (url.contains('/image/upload/')) {
-         fixed = url.replaceFirst('/image/upload/', '/raw/upload/');
-       }
-       // Append .pdf extension if it's missing in a raw upload path
-       if (fixed.contains('/raw/upload/') && !fixed.toLowerCase().endsWith('.pdf')) {
-         fixed = "$fixed.pdf";
-       }
-    }
-    return fixed;
-  }
 
   factory RequestModel.fromMap(Map<String, dynamic> data, String id) {
     return RequestModel(
@@ -75,9 +57,10 @@ class RequestModel {
       timestamp: (data['timestamp'] as Timestamp?)?.toDate() ?? DateTime.now(),
       year: data['year'],
       reason: data['reason'],
-      annexureUrl: _fixUrl(data['annexure_url']),
+      annexureUrl: data['annexure_url'],
       annexureFileType: data['annexure_file_type'],
-      bonafidePdfUrl: _fixUrl(data['bonafide_pdf_url']),
+      // Support both field names during transition
+      bonafideImageUrl: data['bonafide_image_url'] ?? data['bonafide_pdf_url'],
       uploadedAt: (data['uploaded_at'] as Timestamp?)?.toDate(),
       issuedAt: (data['issued_at'] as Timestamp?)?.toDate(),
       rejectionReason: data['rejectionReason'],
@@ -99,7 +82,7 @@ class RequestModel {
       'reason': reason,
       'annexure_url': annexureUrl,
       'annexure_file_type': annexureFileType,
-      'bonafide_pdf_url': bonafidePdfUrl,
+      'bonafide_image_url': bonafideImageUrl,
       'uploaded_at': uploadedAt != null ? Timestamp.fromDate(uploadedAt!) : null,
       'issued_at': issuedAt != null ? Timestamp.fromDate(issuedAt!) : null,
       'rejectionReason': rejectionReason,

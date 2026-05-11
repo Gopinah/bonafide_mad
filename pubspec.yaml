@@ -23,6 +23,9 @@ dependencies:
   google_fonts: ^6.3.3
   path_provider: ^2.1.2
   open_file_plus: ^3.4.1+1
+  pdf: ^3.12.0
+  printing: ^5.13.0
+  permission_handler: ^11.3.1
 
 dev_dependencies:
   flutter_test:

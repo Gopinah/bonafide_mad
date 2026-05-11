@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:http/http.dart' as http;
+import 'package:image_gallery_saver/image_gallery_saver.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'dart:typed_data';
 import '../../services/auth_service.dart';
 import '../../services/database_service.dart';
 import '../../models/request_model.dart';
@@ -143,6 +146,43 @@ class StudentTrackingScreen extends StatelessWidget {
     );
   }
 
+  Future<void> _downloadCertificate(BuildContext context, String url) async {
+    try {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Downloading certificate...")),
+        );
+      }
+
+      final response = await http.get(Uri.parse(url));
+      if (response.statusCode == 200) {
+        final Uint8List bytes = response.bodyBytes;
+        final result = await ImageGallerySaver.saveImage(
+          bytes,
+          quality: 100,
+          name: "Bonafide_${DateTime.now().millisecondsSinceEpoch}",
+        );
+
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text("Certificate saved to gallery successfully!"),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } else {
+        throw Exception("Failed to download image");
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Error: $e")),
+        );
+      }
+    }
+  }
+
   void _viewCertificate(BuildContext context, String url) {
     showDialog(
       context: context,
@@ -159,7 +199,7 @@ class StudentTrackingScreen extends StatelessWidget {
               actions: [
                 IconButton(
                   icon: const Icon(Icons.download),
-                  onPressed: () => launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication),
+                  onPressed: () => _downloadCertificate(context, url),
                 ),
               ],
             ),

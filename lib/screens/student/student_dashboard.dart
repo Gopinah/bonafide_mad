@@ -3,6 +3,11 @@ import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:http/http.dart' as http;
+import 'package:path_provider/path_provider.dart';
+import 'package:open_file_plus/open_file_plus.dart';
+import 'dart:typed_data';
+import 'dart:io';
 import '../../services/auth_service.dart';
 import '../../services/database_service.dart';
 import '../../models/request_model.dart';
@@ -151,6 +156,56 @@ class StudentDashboard extends StatelessWidget {
     );
   }
 
+  Future<void> _downloadCertificate(BuildContext context, String url) async {
+    try {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Downloading certificate...")),
+        );
+      }
+
+      // 1. Fetch the image bytes
+      final response = await http.get(Uri.parse(url));
+      if (response.statusCode == 200) {
+        final Uint8List bytes = response.bodyBytes;
+
+        // 2. Get the app documents directory
+        final directory = await getApplicationDocumentsDirectory();
+        final folderPath = "${directory.path}/BonafideCertificates";
+        final folder = Directory(folderPath);
+        if (!await folder.exists()) {
+          await folder.create(recursive: true);
+        }
+
+        // 3. Save the file locally
+        final fileName = "Bonafide_${DateTime.now().millisecondsSinceEpoch}.png";
+        final filePath = "$folderPath/$fileName";
+        final file = File(filePath);
+        await file.writeAsBytes(bytes);
+
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text("Certificate downloaded successfully"),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+
+        // 4. Open the saved file
+        await OpenFile.open(filePath);
+      } else {
+        throw Exception("Failed to download image: Status ${response.statusCode}");
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Error: $e")),
+        );
+      }
+    }
+  }
+
   void _viewCertificate(BuildContext context, String url) {
     showDialog(
       context: context,
@@ -168,7 +223,7 @@ class StudentDashboard extends StatelessWidget {
               actions: [
                 IconButton(
                   icon: const Icon(Icons.download),
-                  onPressed: () => launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication),
+                  onPressed: () => _downloadCertificate(context, url),
                 ),
               ],
             ),
